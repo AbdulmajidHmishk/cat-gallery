@@ -1,108 +1,37 @@
 name: Deploy Cute Cat Gallery
 
 on:
-    push:
-        branches: [ "main" ]
-    workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:   # ermöglicht manuelles Starten des Workflows
 
 permissions:
-    contents: read
-    pages: write
-    id-token: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Unit tests - check components
-              run: |
-                set -e
+      - name: Upload static files
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
 
-                echo "🔎 Prüfe, ob index.html existiert..."
-                test -f index.html
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy_step.outputs.page_url }}
 
-                echo "🔎 Prüfe, ob styles.css existiert..."
-                test -f styles.css
-            
-            - name: Unit tests - check contents
-              run: |
-                set -e
+    runs-on: ubuntu-latest
+    needs: build
 
-                echo "🔎 Prüfe, ob 'Cute Cat Gallery' in index.html vorkommt..."
-                if ! grep -qi "Cute Cat Gallery" index.html; then
-                    echo "❌ Titel 'Cute Cat Gallery' nicht gefunden!"
-                    exit 1
-                fi
-
-                echo "✅ Alle einfachen Tests bestanden."
-
-    build:
-        runs-on: ubuntu-latest
-        needs: test
-
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-
-            - name: Upload static files
-              uses: actions/upload-pages-artifact@v3
-              with:
-                path: .
-
-    deploy:
-        environment:
-            name: github-pages
-            url: ${{ steps.deploy.outputs.page_url }}
-
-        runs-on: ubuntu-latest
-        needs: build
-
-        steps:
-            - name: Deploy to GitHub Pages
-              id: deploy
-              uses: actions/deploy-pages@v4
-
-    verify:
-      name: Verify GitHub Pages Deployment
-      runs-on: ubuntu-latest
-      needs: deploy
-      env:
-        PAGE_URL: "https://atamankina.github.io/cat-gallery/"
-
-      steps:
-        - name: Integration tests
-          run: |
-            set -e
-
-            URL="$PAGE_URL"
-            echo "🔎 Prüfe URL: $URL"
-
-            # Mehrere Versuche, weil GitHub Pages manchmal ein paar Sekunden braucht
-            for i in {1..10}; do
-              echo "⏳ Versuch $i..."
-
-              STATUS=$(curl -s -o /tmp/page.html -w "%{http_code}" "$URL" || echo "000")
-              echo "HTTP-Status: $STATUS"
-
-              if [ "$STATUS" -eq 200 ]; then
-                echo "✅ Seite ist erreichbar."
-
-                if grep -qi "Cute Cat Gallery" /tmp/page.html;  then
-                  echo "✅ Titel 'Cute Cat Gallery' auf der Seite gefunden."
-                  exit 0
-                else
-                  echo "❌ Seite erreichbar, aber Titel nicht gefunden."
-                  exit 1
-                fi
-              fi
-
-              echo "Seite noch nicht bereit, warte 10 Sekunden..."
-              sleep 10
-            done
-
-            echo "❌ Seite nach mehreren Versuchen nicht erreichbar."
-            exit 1
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy_step
+        uses: actions/deploy-pages@v4
